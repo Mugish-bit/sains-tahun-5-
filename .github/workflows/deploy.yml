@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 jobs:
   build-and-deploy:
@@ -16,7 +16,7 @@ jobs:
         with:
           channel: stable
 
-      - run: flutter build web --release
+      - run: flutter build web --release --base-href=/manusia_dan_tumbuhan/
 
       - uses: peaceiris/actions-gh-pages@v4
         with:
