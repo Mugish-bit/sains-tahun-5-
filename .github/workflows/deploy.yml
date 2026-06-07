@@ -16,7 +16,7 @@ jobs:
         with:
           channel: stable
 
-      - run: flutter build web --release --base-href=/manusia_dan_tumbuhan/
+      - run: flutter build web --release --base-href=/sains-tahun-5-/
 
       - uses: peaceiris/actions-gh-pages@v4
         with:
