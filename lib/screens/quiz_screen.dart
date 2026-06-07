@@ -133,14 +133,12 @@ class _QuizScreenState extends State<QuizScreen>
       _isCorrect = correct;
 
       if (correct) {
-        final timeBonus = (_timeRemaining / 2).round();
         _streak++;
-        final streakBonus = _streak >= 3 ? 5 : 0;
-        _score += 10 + streakBonus + timeBonus;
-        ScoreService.addScore(10 + streakBonus + timeBonus);
+        _score += 1;
+        ScoreService.addScore(1);
         _bounceController.forward(from: 0.0);
         _spawnConfetti();
-        _showPopup('+${10 + streakBonus + timeBonus} ${_streak >= 3 ? '🔥' : '✅'}');
+        _showPopup('+1 ✅');
       } else {
         _streak = 0;
         _shakeController.forward(from: 0.0);
@@ -201,9 +199,9 @@ class _QuizScreenState extends State<QuizScreen>
   }
 
   String _getScoreEmoji() {
-    if (_score >= 150) return '🌟';
-    if (_score >= 100) return '⭐';
-    if (_score >= 50) return '👍';
+    if (_score >= 15) return '🌟';
+    if (_score >= 10) return '⭐';
+    if (_score >= 5) return '👍';
     return '💪';
   }
 
@@ -343,7 +341,7 @@ class _QuizScreenState extends State<QuizScreen>
                                         Text('🎉', style: TextStyle(fontSize: isTablet ? 36 : 28 * s.clamp(0.85, 1.15))),
                                         SizedBox(width: isTablet ? 12 : 8 * s),
                                         Text(
-                                          _streak >= 3 ? 'Hebat! $_streak berturut-turut! 🔥' : 'Betul! +10 mata',
+                                          _streak >= 3 ? 'Hebat! $_streak berturut-turut! 🔥' : 'Betul! +1 mata',
                                           style: TextStyle(
                                             fontSize: isTablet ? 26 : 20 * s.clamp(0.85, 1.15),
                                             fontWeight: FontWeight.bold,

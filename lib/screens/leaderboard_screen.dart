@@ -39,16 +39,16 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   String _getRankEmoji() {
-    if (_currentScore >= 250) return '🥇';
-    if (_currentScore >= 100) return '🥈';
-    if (_currentScore >= 50) return '🥉';
+    if (_currentScore >= 25) return '🥇';
+    if (_currentScore >= 15) return '🥈';
+    if (_currentScore >= 5) return '🥉';
     return '🏃';
   }
 
   String _getRankTitle() {
-    if (_currentScore >= 250) return 'Pencinta Alam Sejati!';
-    if (_currentScore >= 100) return 'Peneroka Aktif!';
-    if (_currentScore >= 50) return 'Pengembara!';
+    if (_currentScore >= 25) return 'Emas! 🥇';
+    if (_currentScore >= 15) return 'Perak! 🥈';
+    if (_currentScore >= 5) return 'Gangsa! 🥉';
     return 'Teruskan Belajar!';
   }
 
@@ -197,11 +197,11 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildMiniBadge('🌱', 10, isTablet, s),
+                    _buildMiniBadge('🥉', 5, isTablet, s),
                     SizedBox(width: isTablet ? 24 : 16 * s),
-                    _buildMiniBadge('🌿', 100, isTablet, s),
+                    _buildMiniBadge('🥈', 15, isTablet, s),
                     SizedBox(width: isTablet ? 24 : 16 * s),
-                    _buildMiniBadge('🌳', 250, isTablet, s),
+                    _buildMiniBadge('🥇', 25, isTablet, s),
                   ],
                 ),
                 SizedBox(height: isTablet ? 32 : 20 * s),
@@ -244,9 +244,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen>
   }
 
   String _getNextMilestone() {
-    if (_currentScore < 10) return '${10 - _currentScore} mata lagi ke 🌱 Pemula';
-    if (_currentScore < 100) return '${100 - _currentScore} mata lagi ke 🌿 Peneroka';
-    if (_currentScore < 250) return '${250 - _currentScore} mata lagi ke 🌳 Pencinta Alam';
+    if (_currentScore < 5) return '${5 - _currentScore} mata lagi ke 🥉 Gangsa';
+    if (_currentScore < 15) return '${15 - _currentScore} mata lagi ke 🥈 Perak';
+    if (_currentScore < 25) return '${25 - _currentScore} mata lagi ke 🥇 Emas';
     return 'Tahniah! Semua lencana diperoleh! 🎉';
   }
 

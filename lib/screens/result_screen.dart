@@ -139,20 +139,20 @@ class _ResultScreenState extends State<ResultScreen>
 
   List<String> _getEarnedBadges() {
     List<String> badges = [];
-    if (_cumulativeScore >= 10) badges.add('Pemula');
-    if (_cumulativeScore >= 100) badges.add('Peneroka');
-    if (_cumulativeScore >= 250) badges.add('Pencinta Alam');
+    if (_cumulativeScore >= 5) badges.add('Gangsa');
+    if (_cumulativeScore >= 15) badges.add('Perak');
+    if (_cumulativeScore >= 25) badges.add('Emas');
     return badges;
   }
 
   String _getBadgeEmoji(String badge) {
-    if (badge == 'Pemula') return '🌱';
-    if (badge == 'Peneroka') return '🌿';
-    return '🌳';
+    if (badge == 'Gangsa') return '🥉';
+    if (badge == 'Perak') return '🥈';
+    return '🥇';
   }
 
   int _getStars() {
-    final pct = widget.score / (widget.totalQuestions * 10);
+    final pct = widget.score / widget.totalQuestions;
     if (pct >= 0.9) return 3;
     if (pct >= 0.7) return 2;
     if (pct >= 0.4) return 1;
@@ -160,7 +160,7 @@ class _ResultScreenState extends State<ResultScreen>
   }
 
   double _getPercentage() {
-    return widget.score / (widget.totalQuestions * 10);
+    return widget.score / widget.totalQuestions;
   }
 
   String _getMessage() {
@@ -189,9 +189,9 @@ class _ResultScreenState extends State<ResultScreen>
     final pct = _getPercentage();
     final newBadges = earnedBadges.where((b) {
       final before = _cumulativeScore - widget.score;
-      if (b == 'Pemula') return before < 10 && _cumulativeScore >= 10;
-      if (b == 'Peneroka') return before < 100 && _cumulativeScore >= 100;
-      if (b == 'Pencinta Alam') return before < 250 && _cumulativeScore >= 250;
+      if (b == 'Gangsa') return before < 5 && _cumulativeScore >= 5;
+      if (b == 'Perak') return before < 15 && _cumulativeScore >= 15;
+      if (b == 'Emas') return before < 25 && _cumulativeScore >= 25;
       return false;
     }).toList();
 
@@ -307,7 +307,7 @@ class _ResultScreenState extends State<ResultScreen>
                                   Padding(
                                     padding: EdgeInsets.only(bottom: isTablet ? 12 : 8 * s),
                                     child: Text(
-                                      '/ ${widget.totalQuestions * 10}',
+                                      '/ ${widget.totalQuestions}',
                                       style: TextStyle(
                                         fontSize: isTablet ? 28 : 20 * s.clamp(0.85, 1.15),
                                         color: Colors.white.withValues(alpha: 0.6),
@@ -353,7 +353,7 @@ class _ResultScreenState extends State<ResultScreen>
                                     Icon(Icons.star, color: Colors.amber, size: isTablet ? 28 : 20),
                                     SizedBox(width: isTablet ? 10 : 6 * s),
                                     Text(
-                                      'Jumlah terkumpul: $_cumulativeScore',
+                                      'Jumlah: $_cumulativeScore / 30',
                                       style: TextStyle(
                                         fontSize: isTablet ? 20 : 15 * s,
                                         fontWeight: FontWeight.w600,

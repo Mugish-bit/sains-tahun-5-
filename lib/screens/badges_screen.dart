@@ -173,20 +173,20 @@ class _BadgeCard extends StatelessWidget {
     bool isUnlocked;
 
     if (index == 0) {
-      title = 'Pemula';
-      emoji = '🌱';
-      requirement = '10 mata';
-      isUnlocked = score >= 10;
+      title = 'Gangsa';
+      emoji = '🥉';
+      requirement = '5 mata';
+      isUnlocked = score >= 5;
     } else if (index == 1) {
-      title = 'Peneroka';
-      emoji = '🌿';
-      requirement = '100 mata';
-      isUnlocked = score >= 100;
+      title = 'Perak';
+      emoji = '🥈';
+      requirement = '15 mata';
+      isUnlocked = score >= 15;
     } else {
-      title = 'Pencinta Alam';
-      emoji = '🌳';
-      requirement = '250 mata';
-      isUnlocked = score >= 250;
+      title = 'Emas';
+      emoji = '🥇';
+      requirement = '25 mata';
+      isUnlocked = score >= 25;
     }
 
     final progress = isUnlocked
@@ -294,8 +294,8 @@ class _BadgeCard extends StatelessWidget {
   }
 
   int _getRequiredScore() {
-    if (index == 0) return 10;
-    if (index == 1) return 100;
-    return 250;
+    if (index == 0) return 5;
+    if (index == 1) return 15;
+    return 25;
   }
 }
