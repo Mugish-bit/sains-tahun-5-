@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../services/score_service.dart';
 import 'home_screen.dart';
@@ -28,9 +29,17 @@ class _ResultScreenState extends State<ResultScreen>
 
   late AnimationController _bounceController;
 
+  late AnimationController _confettiController;
+  final List<_ResultConfetti> _confettiParticles = [];
+  final Random _random = Random();
+
+  late AnimationController _slideUpController;
+  late Animation<Offset> _slideUpAnimation;
+
   @override
   void initState() {
     super.initState();
+
     _scoreController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
@@ -42,17 +51,39 @@ class _ResultScreenState extends State<ResultScreen>
 
     _starController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 800),
     );
     _starAnimation = CurvedAnimation(
       parent: _starController,
-      curve: Curves.easeOutBack,
+      curve: Curves.elasticOut,
     );
 
     _bounceController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
     );
+
+    _confettiController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..addListener(() => setState(() {}))
+     ..addStatusListener((status) {
+        if (status == AnimationStatus.completed) {
+          _confettiParticles.clear();
+        }
+      });
+
+    _slideUpController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _slideUpAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.2),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideUpController,
+      curve: Curves.easeOutCubic,
+    ));
 
     _scoreController.addListener(() {
       setState(() {
@@ -64,6 +95,9 @@ class _ResultScreenState extends State<ResultScreen>
     _scoreController.forward();
     _starController.forward();
     _bounceController.forward();
+    _slideUpController.forward();
+
+    _spawnConfetti();
   }
 
   @override
@@ -71,6 +105,8 @@ class _ResultScreenState extends State<ResultScreen>
     _scoreController.dispose();
     _starController.dispose();
     _bounceController.dispose();
+    _confettiController.dispose();
+    _slideUpController.dispose();
     super.dispose();
   }
 
@@ -79,12 +115,40 @@ class _ResultScreenState extends State<ResultScreen>
     if (mounted) setState(() {});
   }
 
+  void _spawnConfetti() {
+    _confettiParticles.clear();
+    final stars = _getStars();
+    final count = stars == 3 ? 50 : stars == 2 ? 30 : 10;
+    for (int i = 0; i < count; i++) {
+      _confettiParticles.add(_ResultConfetti(
+        x: _random.nextDouble(),
+        y: -_random.nextDouble() * 0.3,
+        speedX: (_random.nextDouble() - 0.5) * 3,
+        speedY: _random.nextDouble() * 4 + 2,
+        rotation: _random.nextDouble() * 6,
+        rotationSpeed: (_random.nextDouble() - 0.5) * 12,
+        size: _random.nextDouble() * 10 + 4,
+        color: [
+          Colors.red, Colors.orange, Colors.yellow, Colors.green,
+          Colors.blue, Colors.purple, Colors.pink, Colors.amber,
+        ][_random.nextInt(8)],
+      ));
+    }
+    _confettiController.forward(from: 0.0);
+  }
+
   List<String> _getEarnedBadges() {
     List<String> badges = [];
-    if (_cumulativeScore >= 10) badges.add('🌱 Pemula');
-    if (_cumulativeScore >= 100) badges.add('🌿 Peneroka');
-    if (_cumulativeScore >= 250) badges.add('🌳 Pencinta Alam');
+    if (_cumulativeScore >= 10) badges.add('Pemula');
+    if (_cumulativeScore >= 100) badges.add('Peneroka');
+    if (_cumulativeScore >= 250) badges.add('Pencinta Alam');
     return badges;
+  }
+
+  String _getBadgeEmoji(String badge) {
+    if (badge == 'Pemula') return '🌱';
+    if (badge == 'Peneroka') return '🌿';
+    return '🌳';
   }
 
   int _getStars() {
@@ -95,24 +159,39 @@ class _ResultScreenState extends State<ResultScreen>
     return 0;
   }
 
+  double _getPercentage() {
+    return widget.score / (widget.totalQuestions * 10);
+  }
+
   String _getMessage() {
     final stars = _getStars();
-    if (stars == 3) return 'Luar Biasa! 🏆';
-    if (stars == 2) return 'Syabas! 👍';
-    if (stars == 1) return 'Teruskan Usaha! 💪';
-    return 'Jangan Putus Asa! 🌱';
+    if (stars == 3) return 'Luar Biasa!';
+    if (stars == 2) return 'Syabas!';
+    if (stars == 1) return 'Teruskan Usaha!';
+    return 'Jangan Putus Asa!';
+  }
+
+  String _getEmoji() {
+    final stars = _getStars();
+    if (stars == 3) return '🏆';
+    if (stars == 2) return '👍';
+    if (stars == 1) return '💪';
+    return '🌱';
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width >= 600;
+    final s = (size.width / 375).clamp(0.8, 1.4);
     final earnedBadges = _getEarnedBadges();
     final stars = _getStars();
+    final pct = _getPercentage();
     final newBadges = earnedBadges.where((b) {
       final before = _cumulativeScore - widget.score;
-      final name = b.split(' ').last;
-      if (name == 'Pemula') return before < 10 && _cumulativeScore >= 10;
-      if (name == 'Peneroka') return before < 100 && _cumulativeScore >= 100;
-      if (name == 'Pencinta Alam') return before < 250 && _cumulativeScore >= 250;
+      if (b == 'Pemula') return before < 10 && _cumulativeScore >= 10;
+      if (b == 'Peneroka') return before < 100 && _cumulativeScore >= 100;
+      if (b == 'Pencinta Alam') return before < 250 && _cumulativeScore >= 250;
       return false;
     }).toList();
 
@@ -130,231 +209,304 @@ class _ResultScreenState extends State<ResultScreen>
           ),
         ),
         child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  AnimatedBuilder(
-                    animation: _starAnimation,
-                    builder: (_, __) => Transform.scale(
-                      scale: 0.5 + _starAnimation.value * 0.5,
-                      child: Text(
-                        _getStarsEmoji(stars),
-                        style: const TextStyle(fontSize: 80),
-                      ),
-                    ),
+          child: Stack(
+            children: [
+              if (_confettiParticles.isNotEmpty)
+                IgnorePointer(
+                  child: CustomPaint(
+                    size: size,
+                    painter: _ResultConfettiPainter(_confettiParticles, _confettiController.value),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _getMessage(),
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Container(
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.15),
-                      borderRadius: BorderRadius.circular(30),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 2,
-                      ),
-                    ),
-                    padding: const EdgeInsets.all(32),
+                ),
+              Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(isTablet ? 32 * s : 20 * s),
+                  child: SlideTransition(
+                    position: _slideUpAnimation,
                     child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          'Markah Anda',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.white.withOpacity(0.9),
+                        AnimatedBuilder(
+                          animation: _starAnimation,
+                          builder: (_, __) {
+                            final scale = 0.5 + _starAnimation.value * 0.5;
+                            return Transform.scale(
+                              scale: scale,
+                              child: Container(
+                                width: isTablet ? 140 : 100 * s.clamp(0.85, 1.15),
+                                height: isTablet ? 140 : 100 * s.clamp(0.85, 1.15),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.4),
+                                    width: isTablet ? 4 : 3,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Text(
+                                    _getEmoji(),
+                                    style: TextStyle(fontSize: (40 + _starAnimation.value * 10) * s.clamp(0.85, 1.15)),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        SizedBox(height: isTablet ? 16 : 12 * s),
+                        ShaderMask(
+                          shaderCallback: (bounds) => const LinearGradient(
+                            colors: [Colors.amber, Colors.orange, Colors.yellow],
+                          ).createShader(bounds),
+                          child: Text(
+                            _getMessage(),
+                            style: TextStyle(
+                              fontSize: isTablet ? 42 : 30 * s.clamp(0.85, 1.15),
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              '$_displayScore',
-                              style: const TextStyle(
-                                fontSize: 64,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.amber,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '/ ${widget.totalQuestions * 10}',
-                              style: TextStyle(
-                                fontSize: 24,
-                                color: Colors.white.withOpacity(0.7),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        _buildStarRow(stars),
-                        const SizedBox(height: 16),
+                        SizedBox(height: isTablet ? 24 : 20 * s),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 10),
+                          width: double.infinity,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
+                            color: Colors.white.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(isTablet ? 36 : 30),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.25),
+                              width: isTablet ? 3 : 2,
+                            ),
+                          ),
+                          padding: EdgeInsets.all(isTablet ? 36 : 24 * s),
+                          child: Column(
+                            children: [
+                              Text(
+                                'Markah Anda',
+                                style: TextStyle(
+                                  fontSize: isTablet ? 22 : 16 * s,
+                                  color: Colors.white.withValues(alpha: 0.85),
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                              SizedBox(height: isTablet ? 8 : 4 * s),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    '$_displayScore',
+                                    style: TextStyle(
+                                      fontSize: isTablet ? 80 : 64 * s.clamp(0.8, 1.1),
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.amber,
+                                      height: 1,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Padding(
+                                    padding: EdgeInsets.only(bottom: isTablet ? 12 : 8 * s),
+                                    child: Text(
+                                      '/ ${widget.totalQuestions * 10}',
+                                      style: TextStyle(
+                                        fontSize: isTablet ? 28 : 20 * s.clamp(0.85, 1.15),
+                                        color: Colors.white.withValues(alpha: 0.6),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: isTablet ? 16 : 12 * s),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isTablet ? 24 : 16 * s,
+                                  vertical: isTablet ? 10 : 6 * s,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
+                                ),
+                                child: Text(
+                                  '${(pct * 100).round()}% betul',
+                                  style: TextStyle(
+                                    fontSize: isTablet ? 20 : 15 * s,
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: isTablet ? 20 : 16 * s),
+                              _buildStarRow(stars, isTablet, s),
+                              SizedBox(height: isTablet ? 20 : 16 * s),
+                              Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isTablet ? 28 : 20 * s,
+                                  vertical: isTablet ? 14 : 10 * s,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(isTablet ? 24 : 20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.star, color: Colors.amber, size: isTablet ? 28 : 20),
+                                    SizedBox(width: isTablet ? 10 : 6 * s),
+                                    Text(
+                                      'Jumlah terkumpul: $_cumulativeScore',
+                                      style: TextStyle(
+                                        fontSize: isTablet ? 20 : 15 * s,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (newBadges.isNotEmpty) ...[
+                          SizedBox(height: isTablet ? 24 : 20 * s),
+                          AnimatedBuilder(
+                            animation: _bounceController,
+                            builder: (_, __) => Transform.scale(
+                              scale: 0.9 + _bounceController.value * 0.1,
+                              child: Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.all(isTablet ? 28 : 20 * s),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [Colors.amber.shade300, Colors.orange.shade400],
+                                  ),
+                                  borderRadius: BorderRadius.circular(isTablet ? 28 : 24),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.amber.withValues(alpha: 0.4),
+                                      blurRadius: 20,
+                                      offset: const Offset(0, 8),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    Text('🎉', style: TextStyle(fontSize: isTablet ? 52 : 40 * s.clamp(0.85, 1.15))),
+                                    SizedBox(height: isTablet ? 12 : 8 * s),
+                                    Text(
+                                      'Lencana Baharu!',
+                                      style: TextStyle(
+                                        fontSize: isTablet ? 28 : 20 * s.clamp(0.85, 1.15),
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    SizedBox(height: isTablet ? 12 : 8 * s),
+                                    ...newBadges.map((b) => Padding(
+                                      padding: EdgeInsets.symmetric(vertical: isTablet ? 8 : 4 * s),
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: isTablet ? 24 : 16 * s,
+                                          vertical: isTablet ? 12 : 8 * s,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.3),
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        child: Text(
+                                          '${_getBadgeEmoji(b)} $b',
+                                          style: TextStyle(
+                                            fontSize: isTablet ? 24 : 18 * s.clamp(0.85, 1.15),
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    )),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (earnedBadges.isNotEmpty && newBadges.isEmpty) ...[
+                          SizedBox(height: isTablet ? 24 : 20 * s),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            alignment: WrapAlignment.center,
+                            children: earnedBadges.map((b) => Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isTablet ? 18 : 12 * s,
+                                vertical: isTablet ? 10 : 6 * s,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                '${_getBadgeEmoji(b)} $b',
+                                style: TextStyle(
+                                  fontSize: isTablet ? 18 : 14 * s,
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                ),
+                              ),
+                            )).toList(),
+                          ),
+                        ],
+                        SizedBox(height: isTablet ? 36 : 28 * s),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(builder: (_) => const HomeScreen()),
+                              (route) => false,
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.green.shade800,
+                            padding: EdgeInsets.symmetric(
+                              horizontal: isTablet ? 64 : 48 * s,
+                              vertical: isTablet ? 20 : 16 * s,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            elevation: 8,
+                            shadowColor: Colors.black.withValues(alpha: 0.2),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.star,
-                                  color: Colors.amber, size: 22),
-                              const SizedBox(width: 8),
+                              Icon(Icons.home, size: isTablet ? 28 : 22),
+                              SizedBox(width: isTablet ? 12 : 8 * s),
                               Text(
-                                'Jumlah terkumpul: $_cumulativeScore',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (newBadges.isNotEmpty) ...[
-                    const SizedBox(height: 24),
-                    AnimatedBuilder(
-                      animation: _bounceController,
-                      builder: (_, __) => Transform.scale(
-                        scale: 0.9 + _bounceController.value * 0.1,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Colors.amber.shade300, Colors.orange.shade400],
-                            ),
-                            borderRadius: BorderRadius.circular(24),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.amber.withOpacity(0.4),
-                                blurRadius: 20,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              const Text('🎉',
-                                  style: TextStyle(fontSize: 40)),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Lencana Baharu!',
+                                'Laman Utama',
                                 style: TextStyle(
-                                  fontSize: 20,
+                                  fontSize: isTablet ? 24 : 18 * s.clamp(0.85, 1.15),
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.white,
                                 ),
                               ),
-                              const SizedBox(height: 8),
-                              ...newBadges.map((b) => Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.3),
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  child: Text(
-                                    b,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              )),
                             ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (earnedBadges.isNotEmpty && newBadges.isEmpty) ...[
-                    const SizedBox(height: 20),
-                    Text(
-                      'Lencana: ${earnedBadges.join(' | ')}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 32),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (_) => const HomeScreen()),
-                        (route) => false,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.green.shade800,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 48, vertical: 18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      elevation: 8,
-                      shadowColor: Colors.black.withOpacity(0.2),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.home, size: 24),
-                        SizedBox(width: 8),
-                        Text(
-                          'Laman Utama',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  String _getStarsEmoji(int stars) {
-    if (stars == 3) return '🌟🌟🌟';
-    if (stars == 2) return '🌟🌟';
-    if (stars == 1) return '🌟';
-    return '⭐';
-  }
-
-  Widget _buildStarRow(int stars) {
+  Widget _buildStarRow(int stars, bool isTablet, double s) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(3, (i) {
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          padding: EdgeInsets.symmetric(horizontal: isTablet ? 8 : 4),
           child: AnimatedBuilder(
             animation: _starAnimation,
             builder: (_, __) {
@@ -365,10 +517,19 @@ class _ResultScreenState extends State<ResultScreen>
                   .clamp(0.0, 1.0);
               return Transform.scale(
                 scale: i < stars ? animValue : 1.0,
-                child: Icon(
-                  i < stars ? Icons.star : Icons.star_border,
-                  color: i < stars ? Colors.amber : Colors.white.withOpacity(0.4),
-                  size: 40,
+                child: Container(
+                  padding: EdgeInsets.all(isTablet ? 10 : 6),
+                  decoration: BoxDecoration(
+                    color: i < stars
+                        ? Colors.amber.withValues(alpha: 0.2)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    i < stars ? Icons.star : Icons.star_border,
+                    color: i < stars ? Colors.amber : Colors.white.withValues(alpha: 0.4),
+                    size: isTablet ? 48 : 36 * s.clamp(0.85, 1.15),
+                  ),
                 ),
               );
             },
@@ -377,4 +538,46 @@ class _ResultScreenState extends State<ResultScreen>
       }),
     );
   }
+}
+
+class _ResultConfetti {
+  final double x, y, speedX, speedY, rotation, rotationSpeed, size;
+  final Color color;
+
+  _ResultConfetti({
+    required this.x,
+    required this.y,
+    required this.speedX,
+    required this.speedY,
+    required this.rotation,
+    required this.rotationSpeed,
+    required this.size,
+    required this.color,
+  });
+}
+
+class _ResultConfettiPainter extends CustomPainter {
+  final List<_ResultConfetti> particles;
+  final double progress;
+
+  _ResultConfettiPainter(this.particles, this.progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final p in particles) {
+      final x = (p.x + p.speedX * progress) * size.width;
+      final y = (p.y + p.speedY * progress + 200 * progress * progress) * size.height / 800;
+      final rotation = p.rotation + p.rotationSpeed * progress;
+      if (y < -50 || y > size.height + 50) continue;
+      canvas.save();
+      canvas.translate(x, y);
+      canvas.rotate(rotation);
+      final paint = Paint()..color = p.color.withValues(alpha: (1 - progress * 0.6) * 0.8);
+      canvas.drawRect(Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.6), paint);
+      canvas.restore();
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _ResultConfettiPainter oldDelegate) => oldDelegate.progress != progress;
 }

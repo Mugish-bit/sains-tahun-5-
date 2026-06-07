@@ -22,6 +22,10 @@ class _QuizScreenState extends State<QuizScreen>
   int _selectedOption = -1;
   bool _isCorrect = false;
 
+  static const int _timerDuration = 20;
+  int _timeRemaining = _timerDuration;
+  late AnimationController _timerController;
+
   late AnimationController _bounceController;
   late Animation<double> _bounceAnimation;
 
@@ -41,6 +45,23 @@ class _QuizScreenState extends State<QuizScreen>
   void initState() {
     super.initState();
     _questions = List.from(widget.questions);
+
+    _timerController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: _timerDuration),
+    )..addListener(() {
+      if (!_isAnswered) {
+        final elapsed = (_timerController.value * _timerDuration).round();
+        if (elapsed != _timeRemaining) {
+          setState(() => _timeRemaining = _timerDuration - elapsed);
+        }
+      }
+    })..addStatusListener((status) {
+      if (status == AnimationStatus.dismissed && !_isAnswered) {
+        _checkAnswer(-1);
+      }
+    });
+    _timerController.forward();
 
     _bounceController = AnimationController(
       vsync: this,
@@ -92,6 +113,7 @@ class _QuizScreenState extends State<QuizScreen>
 
   @override
   void dispose() {
+    _timerController.dispose();
     _bounceController.dispose();
     _confettiController.dispose();
     _shakeController.dispose();
@@ -102,7 +124,8 @@ class _QuizScreenState extends State<QuizScreen>
   void _checkAnswer(int selectedIndex) {
     if (_isAnswered) return;
 
-    final correct = selectedIndex == _questions[_currentQuestionIndex].correctOptionIndex;
+    _timerController.stop();
+    final correct = selectedIndex >= 0 && selectedIndex == _questions[_currentQuestionIndex].correctOptionIndex;
 
     setState(() {
       _isAnswered = true;
@@ -110,13 +133,14 @@ class _QuizScreenState extends State<QuizScreen>
       _isCorrect = correct;
 
       if (correct) {
+        final timeBonus = (_timeRemaining / 2).round();
         _streak++;
-        final bonus = _streak >= 3 ? 5 : 0;
-        _score += 10 + bonus;
-        ScoreService.addScore(10 + bonus);
+        final streakBonus = _streak >= 3 ? 5 : 0;
+        _score += 10 + streakBonus + timeBonus;
+        ScoreService.addScore(10 + streakBonus + timeBonus);
         _bounceController.forward(from: 0.0);
         _spawnConfetti();
-        _showPopup('+10${bonus > 0 ? '+$bonus' : ''} ${_streak >= 3 ? '🔥' : '✅'}');
+        _showPopup('+${10 + streakBonus + timeBonus} ${_streak >= 3 ? '🔥' : '✅'}');
       } else {
         _streak = 0;
         _shakeController.forward(from: 0.0);
@@ -153,6 +177,9 @@ class _QuizScreenState extends State<QuizScreen>
 
   void _nextQuestion() {
     if (_currentQuestionIndex + 1 < _questions.length) {
+      _timerController.reset();
+      _timeRemaining = _timerDuration;
+      _timerController.forward();
       _slideController.forward(from: 0.0);
       setState(() {
         _currentQuestionIndex++;
@@ -182,6 +209,9 @@ class _QuizScreenState extends State<QuizScreen>
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width >= 600;
+    final s = (size.width / 375).clamp(0.8, 1.4);
     final question = _questions[_currentQuestionIndex];
     final isImageOptions = question.optionImagePaths != null && question.optionImagePaths!.isNotEmpty;
     final progress = (_currentQuestionIndex + 1) / _questions.length;
@@ -200,28 +230,33 @@ class _QuizScreenState extends State<QuizScreen>
             child: SafeArea(
               child: Column(
                 children: [
-                  _buildTopBar(progress),
+                  _buildTopBar(progress, isTablet, s),
+                  _buildQuestionDots(isTablet, s),
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(20),
+                      padding: EdgeInsets.all(isTablet ? 24 * s : 16 * s),
                       child: SlideTransition(
                         position: _slideAnimation,
                         child: Column(
                           children: [
                             if (question.imagePath != null)
                               Container(
-                                margin: const EdgeInsets.only(bottom: 16),
-                                padding: const EdgeInsets.all(8),
+                                margin: EdgeInsets.only(bottom: isTablet ? 20 : 16 * s),
+                                padding: EdgeInsets.all(isTablet ? 12 : 8 * s),
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(isTablet ? 24 : 20),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.green.withOpacity(0.15), blurRadius: 10, offset: const Offset(0, 4)),
+                                    BoxShadow(color: Colors.green.withValues(alpha: 0.15), blurRadius: 10, offset: const Offset(0, 4)),
                                   ],
                                 ),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(14),
-                                  child: Image.asset(question.imagePath!, height: 120, fit: BoxFit.contain),
+                                  child: Image.asset(
+                                    question.imagePath!,
+                                    height: isTablet ? 200 : 120 * s.clamp(0.8, 1.2),
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
                               ),
                             AnimatedBuilder(
@@ -241,9 +276,9 @@ class _QuizScreenState extends State<QuizScreen>
                                 width: double.infinity,
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.circular(24),
+                                  borderRadius: BorderRadius.circular(isTablet ? 28 : 24),
                                   boxShadow: [
-                                    BoxShadow(color: Colors.green.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 6)),
+                                    BoxShadow(color: Colors.green.withValues(alpha: 0.1), blurRadius: 15, offset: const Offset(0, 6)),
                                   ],
                                   border: _isAnswered
                                       ? Border.all(
@@ -252,27 +287,35 @@ class _QuizScreenState extends State<QuizScreen>
                                         )
                                       : null,
                                 ),
-                                padding: const EdgeInsets.all(24),
+                                padding: EdgeInsets.all(isTablet ? 28 * s : 20 * s),
                                 child: Column(
                                   children: [
                                     Row(
                                       children: [
                                         Container(
-                                          padding: const EdgeInsets.all(8),
+                                          padding: EdgeInsets.all(isTablet ? 12 : 8 * s),
                                           decoration: BoxDecoration(
                                             color: Colors.green.shade100,
                                             borderRadius: BorderRadius.circular(12),
                                           ),
                                           child: Text(
                                             'Q${_currentQuestionIndex + 1}',
-                                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+                                            style: TextStyle(
+                                              fontSize: isTablet ? 22 : 16 * s.clamp(0.85, 1.15),
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.green.shade800,
+                                            ),
                                           ),
                                         ),
-                                        const SizedBox(width: 12),
+                                        SizedBox(width: isTablet ? 16 : 12 * s),
                                         Expanded(
                                           child: Text(
                                             question.question,
-                                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, height: 1.4),
+                                            style: TextStyle(
+                                              fontSize: isTablet ? 24 : 18 * s.clamp(0.85, 1.15),
+                                              fontWeight: FontWeight.w600,
+                                              height: 1.4,
+                                            ),
                                           ),
                                         ),
                                       ],
@@ -281,14 +324,14 @@ class _QuizScreenState extends State<QuizScreen>
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 24),
+                            SizedBox(height: isTablet ? 28 : 20 * s),
                             if (_isAnswered && _isCorrect)
                               AnimatedBuilder(
                                 animation: _bounceAnimation,
                                 builder: (_, child) => Transform.scale(
                                   scale: 0.8 + _bounceAnimation.value * 0.2,
                                   child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                    padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 24 * s, vertical: isTablet ? 16 : 12 * s),
                                     decoration: BoxDecoration(
                                       color: Colors.green.shade100,
                                       borderRadius: BorderRadius.circular(30),
@@ -297,11 +340,15 @@ class _QuizScreenState extends State<QuizScreen>
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        const Text('🎉', style: TextStyle(fontSize: 28)),
-                                        const SizedBox(width: 8),
+                                        Text('🎉', style: TextStyle(fontSize: isTablet ? 36 : 28 * s.clamp(0.85, 1.15))),
+                                        SizedBox(width: isTablet ? 12 : 8 * s),
                                         Text(
                                           _streak >= 3 ? 'Hebat! $_streak berturut-turut! 🔥' : 'Betul! +10 mata',
-                                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green.shade800),
+                                          style: TextStyle(
+                                            fontSize: isTablet ? 26 : 20 * s.clamp(0.85, 1.15),
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.green.shade800,
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -310,7 +357,7 @@ class _QuizScreenState extends State<QuizScreen>
                               ),
                             if (_isAnswered && !_isCorrect)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 24 * s, vertical: isTablet ? 16 : 12 * s),
                                 decoration: BoxDecoration(
                                   color: Colors.red.shade50,
                                   borderRadius: BorderRadius.circular(30),
@@ -319,22 +366,26 @@ class _QuizScreenState extends State<QuizScreen>
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    const Text('😅', style: TextStyle(fontSize: 28)),
-                                    const SizedBox(width: 8),
+                                    Text('😅', style: TextStyle(fontSize: isTablet ? 36 : 28 * s.clamp(0.85, 1.15))),
+                                    SizedBox(width: isTablet ? 12 : 8 * s),
                                     Expanded(
                                       child: Text(
                                         'Jawapan: ${_getCorrectAnswerText(question)}',
-                                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.red.shade800),
+                                        style: TextStyle(
+                                          fontSize: isTablet ? 22 : 16 * s.clamp(0.85, 1.15),
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.red.shade800,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                            const SizedBox(height: 20),
+                            SizedBox(height: isTablet ? 24 : 16 * s),
                             if (isImageOptions)
-                              _buildImageOptions(question)
+                              _buildImageOptions(question, isTablet, s)
                             else
-                              _buildTextOptions(question),
+                              _buildTextOptions(question, isTablet, s),
                           ],
                         ),
                       ),
@@ -343,26 +394,26 @@ class _QuizScreenState extends State<QuizScreen>
                   if (_isAnswered)
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                      padding: EdgeInsets.fromLTRB(20 * s, 0, 20 * s, 20 * s),
                       child: ElevatedButton(
                         onPressed: _nextQuestion,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          padding: EdgeInsets.symmetric(vertical: isTablet ? 24 : 18 * s),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(isTablet ? 24 : 20)),
                           elevation: 6,
-                          shadowColor: Colors.orange.withOpacity(0.4),
+                          shadowColor: Colors.orange.withValues(alpha: 0.4),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
                               _currentQuestionIndex + 1 < _questions.length ? 'Soalan Seterusnya' : 'Lihat Keputusan',
-                              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                              style: TextStyle(fontSize: isTablet ? 26 : 20 * s.clamp(0.85, 1.15), fontWeight: FontWeight.bold),
                             ),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.arrow_forward),
+                            SizedBox(width: isTablet ? 12 : 8 * s),
+                            Icon(Icons.arrow_forward, size: isTablet ? 28 : 24),
                           ],
                         ),
                       ),
@@ -398,7 +449,7 @@ class _QuizScreenState extends State<QuizScreen>
                   fontWeight: FontWeight.bold,
                   color: popup.text.contains('❌') ? Colors.red : Colors.green,
                   shadows: [
-                    Shadow(color: Colors.black.withOpacity(0.2), blurRadius: 8),
+                    Shadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 8),
                   ],
                 ),
               ),
@@ -409,19 +460,52 @@ class _QuizScreenState extends State<QuizScreen>
     );
   }
 
-  Widget _buildTopBar(double progress) {
+  Widget _buildQuestionDots(bool isTablet, double s) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: EdgeInsets.symmetric(horizontal: 20 * s, vertical: 6 * s),
+      color: Colors.white.withValues(alpha: 0.7),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(_questions.length, (i) {
+            final isCurrent = i == _currentQuestionIndex;
+            final isPast = i < _currentQuestionIndex;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: isCurrent ? (isTablet ? 28 : 20 * s) : (isTablet ? 12 : 8 * s),
+              height: isTablet ? 12 : 8 * s,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(4),
+                color: isCurrent
+                    ? Colors.green
+                    : isPast
+                        ? Colors.green.shade300
+                        : Colors.grey.shade300,
+              ),
+            );
+          }),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopBar(double progress, bool isTablet, double s) {
+    final timerColor = _timeRemaining > 10 ? Colors.green : (_timeRemaining > 5 ? Colors.orange : Colors.red);
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(16 * s, 8 * s, 16 * s, 8 * s),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)],
+        color: Colors.white.withValues(alpha: 0.95),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 10)],
       ),
       child: Column(
         children: [
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.grey),
+                icon: Icon(Icons.arrow_back, color: Colors.grey, size: isTablet ? 28 : 24),
                 onPressed: () => Navigator.pop(context),
               ),
               Expanded(
@@ -429,26 +513,71 @@ class _QuizScreenState extends State<QuizScreen>
                   children: [
                     Text(
                       'Soalan ${_currentQuestionIndex + 1}/${_questions.length}',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.green.shade800),
-                    ),
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 10,
-                        backgroundColor: Colors.green.shade200,
-                        valueColor: AlwaysStoppedAnimation<Color>(_getProgressColor(progress)),
+                      style: TextStyle(
+                        fontSize: isTablet ? 22 : 16 * s.clamp(0.85, 1.15),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green.shade800,
                       ),
+                    ),
+                    SizedBox(height: isTablet ? 8 : 6 * s),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: LinearProgressIndicator(
+                              value: progress,
+                              minHeight: isTablet ? 14 : 10 * s,
+                              backgroundColor: Colors.green.shade200,
+                              valueColor: AlwaysStoppedAnimation<Color>(_getProgressColor(progress)),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: isTablet ? 12 : 8 * s),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: isTablet ? 14 : 10 * s,
+                            vertical: isTablet ? 8 : 4 * s,
+                          ),
+                          decoration: BoxDecoration(
+                            color: timerColor.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: timerColor, width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _timeRemaining > 10 ? Icons.timer : Icons.timer_off,
+                                color: timerColor,
+                                size: isTablet ? 22 : 16 * s.clamp(0.85, 1.15),
+                              ),
+                              SizedBox(width: isTablet ? 6 : 4 * s),
+                              Text(
+                                '$_timeRemaining',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: timerColor,
+                                  fontSize: isTablet ? 22 : 15 * s.clamp(0.85, 1.15),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: isTablet ? 12 : 8 * s),
               if (_streak >= 2)
                 Container(
-                  margin: const EdgeInsets.only(right: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  margin: EdgeInsets.only(right: isTablet ? 8 : 4 * s),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isTablet ? 14 : 8 * s,
+                    vertical: isTablet ? 8 : 4 * s,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.orange.shade100,
                     borderRadius: BorderRadius.circular(12),
@@ -457,17 +586,24 @@ class _QuizScreenState extends State<QuizScreen>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('🔥', style: TextStyle(fontSize: 14 + min(_streak.toDouble(), 5) * 2)),
-                      const SizedBox(width: 2),
+                      Text('🔥', style: TextStyle(fontSize: (14 + min(_streak.toDouble(), 5) * 2) * s.clamp(0.85, 1.15))),
+                      SizedBox(width: isTablet ? 6 : 2 * s),
                       Text(
                         '$_streak',
-                        style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange.shade900, fontSize: 16),
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange.shade900,
+                          fontSize: isTablet ? 22 : 16 * s.clamp(0.85, 1.15),
+                        ),
                       ),
                     ],
                   ),
                 ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 20 : 14 * s,
+                  vertical: isTablet ? 10 : 8 * s,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.amber.shade100,
                   borderRadius: BorderRadius.circular(16),
@@ -476,11 +612,15 @@ class _QuizScreenState extends State<QuizScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(_getScoreEmoji(), style: const TextStyle(fontSize: 18)),
-                    const SizedBox(width: 4),
+                    Text(_getScoreEmoji(), style: TextStyle(fontSize: isTablet ? 26 : 18 * s.clamp(0.85, 1.15))),
+                    SizedBox(width: isTablet ? 8 : 4 * s),
                     Text(
                       '$_score',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.orange.shade900),
+                      style: TextStyle(
+                        fontSize: isTablet ? 26 : 18 * s.clamp(0.85, 1.15),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange.shade900,
+                      ),
                     ),
                   ],
                 ),
@@ -506,12 +646,15 @@ class _QuizScreenState extends State<QuizScreen>
     return 'Lihat gambar yang betul';
   }
 
-  Widget _buildImageOptions(QuizQuestion question) {
+  Widget _buildImageOptions(QuizQuestion question, bool isTablet, double s) {
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2, childAspectRatio: 1.0, crossAxisSpacing: 15, mainAxisSpacing: 15,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: isTablet ? 3 : 2,
+        childAspectRatio: isTablet ? 1.2 : 1.0,
+        crossAxisSpacing: isTablet ? 20 : 15 * s,
+        mainAxisSpacing: isTablet ? 20 : 15 * s,
       ),
       itemCount: question.optionImagePaths!.length,
       itemBuilder: (context, index) {
@@ -529,37 +672,37 @@ class _QuizScreenState extends State<QuizScreen>
             duration: const Duration(milliseconds: 300),
             transform: (isSelected && !_isAnswered) ? Matrix4.translationValues(0, -8, 0) : Matrix4.identity(),
             decoration: BoxDecoration(
-              border: Border.all(color: borderColor, width: 4),
-              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: isTablet ? 5 : 4),
+              borderRadius: BorderRadius.circular(isTablet ? 24 : 20),
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: borderColor == Colors.white ? Colors.grey.withOpacity(0.2) : borderColor.withOpacity(0.3),
+                  color: borderColor == Colors.white ? Colors.grey.withValues(alpha: 0.2) : borderColor.withValues(alpha: 0.3),
                   blurRadius: elevation * 2, offset: const Offset(0, 4),
                 ),
               ],
             ),
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(isTablet ? 18 : 16),
               child: Stack(
                 children: [
                   Center(
                     child: Padding(
-                      padding: const EdgeInsets.all(8),
+                      padding: EdgeInsets.all(isTablet ? 12 : 8 * s),
                       child: Image.asset(question.optionImagePaths![index], fit: BoxFit.contain),
                     ),
                   ),
                   if (_isAnswered && isCorrect)
                     Positioned(top: 4, right: 4, child: Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: EdgeInsets.all(isTablet ? 8 : 4 * s),
                       decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                      child: const Icon(Icons.check, color: Colors.white, size: 20),
+                      child: Icon(Icons.check, color: Colors.white, size: isTablet ? 28 : 20 * s.clamp(0.85, 1.15)),
                     )),
                   if (_isAnswered && isSelected && !isCorrect)
                     Positioned(top: 4, right: 4, child: Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: EdgeInsets.all(isTablet ? 8 : 4 * s),
                       decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                      child: const Icon(Icons.close, color: Colors.white, size: 20),
+                      child: Icon(Icons.close, color: Colors.white, size: isTablet ? 28 : 20 * s.clamp(0.85, 1.15)),
                     )),
                 ],
               ),
@@ -570,70 +713,90 @@ class _QuizScreenState extends State<QuizScreen>
     );
   }
 
-  Widget _buildTextOptions(QuizQuestion question) {
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2, childAspectRatio: 2.5, crossAxisSpacing: 12, mainAxisSpacing: 12,
-      ),
-      itemCount: question.options!.length,
-      itemBuilder: (context, index) {
-        final isCorrect = index == question.correctOptionIndex;
-        final isSelected = _selectedOption == index;
-        final labels = ['A', 'B', 'C', 'D'];
+  Widget _buildTextOptions(QuizQuestion question, bool isTablet, double s) {
+    final labels = ['A', 'B', 'C', 'D'];
+    final is2Col = isTablet || question.options!.length > 2;
 
-        Color bgColor = Colors.white;
-        Color borderColor = Colors.grey.shade300;
-        Color labelColor = Colors.grey.shade600;
-        if (_isAnswered) {
-          if (isCorrect) { bgColor = Colors.green.shade100; borderColor = Colors.green; labelColor = Colors.green; }
-          else if (isSelected && !isCorrect) { bgColor = Colors.red.shade50; borderColor = Colors.red; labelColor = Colors.red; }
-        } else if (isSelected) { bgColor = Colors.blue.shade50; borderColor = Colors.blue; labelColor = Colors.blue; }
+    if (is2Col) {
+      return GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: isTablet ? 3 : 2,
+          childAspectRatio: isTablet ? 2.8 : 1.6,
+          crossAxisSpacing: isTablet ? 16 : 10,
+          mainAxisSpacing: isTablet ? 16 : 10,
+        ),
+        itemCount: question.options!.length,
+        itemBuilder: (context, index) => _buildOptionCard(question, index, labels, isTablet, s),
+      );
+    }
 
-        return GestureDetector(
-          onTap: _isAnswered ? null : () => _checkAnswer(index),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            transform: (isSelected && !_isAnswered) ? Matrix4.translationValues(0, -4, 0) : Matrix4.identity(),
-            decoration: BoxDecoration(
-              color: bgColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor, width: 2),
-              boxShadow: [BoxShadow(color: borderColor.withOpacity(0.15), blurRadius: 8, offset: const Offset(0, 3))],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32, height: 32,
-                    decoration: BoxDecoration(
-                      color: _isAnswered && (isCorrect || (isSelected && !isCorrect)) ? borderColor : Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Center(
-                      child: _isAnswered && isCorrect
-                          ? const Icon(Icons.check, color: Colors.white, size: 18)
-                          : _isAnswered && isSelected && !isCorrect
-                              ? const Icon(Icons.close, color: Colors.white, size: 18)
-                              : Text(labels[index], style: TextStyle(fontWeight: FontWeight.bold, color: labelColor, fontSize: 14)),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      question.options![index],
-                      style: TextStyle(fontSize: 14, fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, color: isSelected ? labelColor : Colors.black87),
-                      maxLines: 2, overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
+    return Column(
+      children: List.generate(question.options!.length, (index) => Padding(
+        padding: EdgeInsets.only(bottom: 10),
+        child: _buildOptionCard(question, index, labels, isTablet, s),
+      )),
+    );
+  }
+
+  Widget _buildOptionCard(QuizQuestion question, int index, List<String> labels, bool isTablet, double s) {
+    final isCorrect = index == question.correctOptionIndex;
+    final isSelected = _selectedOption == index;
+
+    Color bgColor = Colors.white;
+    Color borderColor = Colors.grey.shade300;
+    Color labelColor = Colors.grey.shade600;
+    if (_isAnswered) {
+      if (isCorrect) { bgColor = Colors.green.shade100; borderColor = Colors.green; labelColor = Colors.green; }
+      else if (isSelected && !isCorrect) { bgColor = Colors.red.shade50; borderColor = Colors.red; labelColor = Colors.red; }
+    } else if (isSelected) { bgColor = Colors.blue.shade50; borderColor = Colors.blue; labelColor = Colors.blue; }
+
+    return GestureDetector(
+      onTap: _isAnswered ? null : () => _checkAnswer(index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        transform: (isSelected && !_isAnswered) ? Matrix4.translationValues(0, -4, 0) : Matrix4.identity(),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(isTablet ? 20 : 16),
+          border: Border.all(color: borderColor, width: isTablet ? 3 : 2),
+          boxShadow: [BoxShadow(color: borderColor.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 3))],
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: isTablet ? 16 : 12, vertical: isTablet ? 14 : 12),
+          child: Row(
+            children: [
+              Container(
+                width: isTablet ? 44 : 32,
+                height: isTablet ? 44 : 32,
+                decoration: BoxDecoration(
+                  color: _isAnswered && (isCorrect || (isSelected && !isCorrect)) ? borderColor : Colors.grey.shade200,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: _isAnswered && isCorrect
+                      ? Icon(Icons.check, color: Colors.white, size: isTablet ? 24 : 18)
+                      : _isAnswered && isSelected && !isCorrect
+                          ? Icon(Icons.close, color: Colors.white, size: isTablet ? 24 : 18)
+                          : Text(labels[index], style: TextStyle(fontWeight: FontWeight.bold, color: labelColor, fontSize: isTablet ? 20 : 14)),
+                ),
               ),
-            ),
+              SizedBox(width: isTablet ? 14 : 10),
+              Expanded(
+                child: Text(
+                  question.options![index],
+                  style: TextStyle(
+                    fontSize: isTablet ? 20 : 14,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected ? labelColor : Colors.black87,
+                  ),
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -674,7 +837,7 @@ class _ConfettiPainter extends CustomPainter {
       canvas.save();
       canvas.translate(x, y);
       canvas.rotate(rotation);
-      final paint = Paint()..color = p.color.withOpacity((1 - progress) * 0.9);
+      final paint = Paint()..color = p.color.withValues(alpha: (1 - progress) * 0.9);
       canvas.drawRect(Rect.fromCenter(center: Offset.zero, width: p.size, height: p.size * 0.6), paint);
       canvas.restore();
     }

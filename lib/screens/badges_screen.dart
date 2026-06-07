@@ -36,6 +36,10 @@ class _BadgesScreenState extends State<BadgesScreen>
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isTablet = size.width >= 600;
+    final s = (size.width / 375).clamp(0.8, 1.4);
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -49,16 +53,16 @@ class _BadgesScreenState extends State<BadgesScreen>
           child: Column(
             children: [
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(isTablet ? 28 : 20 * s),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(30),
                     bottomRight: Radius.circular(30),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.purple.withOpacity(0.1),
+                      color: Colors.purple.withValues(alpha: 0.1),
                       blurRadius: 15,
                       offset: const Offset(0, 5),
                     ),
@@ -69,24 +73,26 @@ class _BadgesScreenState extends State<BadgesScreen>
                     Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.grey),
+                          icon: Icon(Icons.arrow_back, color: Colors.grey, size: isTablet ? 28 : 24),
                           onPressed: () => Navigator.pop(context),
                         ),
-                        const SizedBox(width: 8),
-                        const Text(
+                        SizedBox(width: isTablet ? 12 : 8 * s),
+                        Text(
                           'Lencana Saya',
                           style: TextStyle(
-                            fontSize: 24,
+                            fontSize: isTablet ? 32 : 24 * s.clamp(0.85, 1.15),
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF4A148C),
+                            color: const Color(0xFF4A148C),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: isTablet ? 16 : 12 * s),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: isTablet ? 36 : 24 * s,
+                        vertical: isTablet ? 18 : 12 * s,
+                      ),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [Colors.amber.shade300, Colors.orange.shade400],
@@ -96,12 +102,12 @@ class _BadgesScreenState extends State<BadgesScreen>
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.star, color: Colors.white, size: 28),
-                          const SizedBox(width: 8),
+                          Icon(Icons.star, color: Colors.white, size: isTablet ? 36 : 28),
+                          SizedBox(width: isTablet ? 12 : 8 * s),
                           Text(
                             '$_score Mata',
-                            style: const TextStyle(
-                              fontSize: 22,
+                            style: TextStyle(
+                              fontSize: isTablet ? 30 : 22 * s.clamp(0.85, 1.15),
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
@@ -112,16 +118,16 @@ class _BadgesScreenState extends State<BadgesScreen>
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: isTablet ? 28 : 20 * s),
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: EdgeInsets.symmetric(horizontal: isTablet ? 32 : 20 * s),
                   child: GridView.builder(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.85,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: isTablet ? 3 : 2,
+                      childAspectRatio: isTablet ? 1.0 : 0.85,
+                      crossAxisSpacing: isTablet ? 24 : 16 * s,
+                      mainAxisSpacing: isTablet ? 24 : 16 * s,
                     ),
                     itemCount: 3,
                     itemBuilder: (context, index) {
@@ -129,6 +135,8 @@ class _BadgesScreenState extends State<BadgesScreen>
                         index: index,
                         score: _score,
                         pulseController: _pulseController,
+                        isTablet: isTablet,
+                        s: s,
                       );
                     },
                   ),
@@ -146,11 +154,15 @@ class _BadgeCard extends StatelessWidget {
   final int index;
   final int score;
   final AnimationController pulseController;
+  final bool isTablet;
+  final double s;
 
   const _BadgeCard({
     required this.index,
     required this.score,
     required this.pulseController,
+    this.isTablet = false,
+    this.s = 1.0,
   });
 
   @override
@@ -183,7 +195,7 @@ class _BadgeCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(isTablet ? 28 : 24),
         gradient: isUnlocked
             ? LinearGradient(
                 begin: Alignment.topLeft,
@@ -191,17 +203,17 @@ class _BadgeCard extends StatelessWidget {
                 colors: [Colors.white, Colors.amber.shade50],
               )
             : null,
-        color: isUnlocked ? null : Colors.white.withOpacity(0.5),
+        color: isUnlocked ? null : Colors.white.withValues(alpha: 0.5),
         border: Border.all(
           color: isUnlocked
               ? Colors.amber.shade300
               : Colors.grey.shade300,
-          width: 2,
+          width: isTablet ? 3 : 2,
         ),
         boxShadow: isUnlocked
             ? [
                 BoxShadow(
-                  color: Colors.amber.withOpacity(0.3),
+                  color: Colors.amber.withValues(alpha: 0.3),
                   blurRadius: 15,
                   offset: const Offset(0, 6),
                 ),
@@ -221,45 +233,45 @@ class _BadgeCard extends StatelessWidget {
                 scale: glow,
                 child: Opacity(
                   opacity: isUnlocked ? 1.0 : 0.4,
-                  child: Text(emoji, style: TextStyle(fontSize: 48 + (isUnlocked ? 8 : 0))),
+                  child: Text(emoji, style: TextStyle(fontSize: (48 + (isUnlocked ? 8 : 0)) * s.clamp(0.85, 1.15))),
                 ),
               );
             },
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: isTablet ? 12 : 8 * s),
           Text(
             title,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: isTablet ? 24 : 18 * s.clamp(0.85, 1.15),
               fontWeight: FontWeight.bold,
               color: isUnlocked ? Colors.deepPurple.shade800 : Colors.grey,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: isTablet ? 8 : 4 * s),
           if (isUnlocked)
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              padding: EdgeInsets.symmetric(horizontal: isTablet ? 16 : 12 * s, vertical: isTablet ? 8 : 4 * s),
               decoration: BoxDecoration(
                 color: Colors.green.shade100,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green, size: 16),
-                  SizedBox(width: 4),
-                  Text('Dibuka', style: TextStyle(fontSize: 12, color: Colors.green)),
+                  Icon(Icons.check_circle, color: Colors.green, size: isTablet ? 22 : 16),
+                  SizedBox(width: isTablet ? 8 : 4 * s),
+                  Text('Dibuka', style: TextStyle(fontSize: isTablet ? 16 : 12 * s, color: Colors.green)),
                 ],
               ),
             )
           else ...[
             Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
+              margin: EdgeInsets.symmetric(horizontal: isTablet ? 28 : 20 * s),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: LinearProgressIndicator(
                   value: progress,
-                  minHeight: 6,
+                  minHeight: isTablet ? 10 : 6 * s,
                   backgroundColor: Colors.grey.shade300,
                   valueColor: AlwaysStoppedAnimation<Color>(
                     Colors.amber.shade600,
@@ -267,11 +279,11 @@ class _BadgeCard extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: isTablet ? 8 : 4 * s),
             Text(
-              '$requirement',
-              style: const TextStyle(
-                fontSize: 11,
+              requirement,
+              style: TextStyle(
+                fontSize: isTablet ? 16 : 11 * s,
                 color: Colors.grey,
               ),
             ),
